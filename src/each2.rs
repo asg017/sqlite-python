@@ -128,7 +128,8 @@ impl VTabCursor for PyEachCursor2 {
             let iter = self.iterator.as_ref().unwrap();
             self.value = match iter.call_method0(py, "__next__") {
                 Ok(value) => Some(value),
-                Err(err) => None,
+                // TODO distinguish between StopIteration and others
+                Err(_) => None,
             }
             //let item = iter.next();
         });

@@ -3,7 +3,7 @@ use sqlite_loadable::prelude::*;
 use sqlite_loadable::{api, Result};
 
 pub fn py_version(context: *mut sqlite3_context, _values: &[*mut sqlite3_value]) -> Result<()> {
-    api::result_text(context, &format!("v{}", env!("CARGO_PKG_VERSION")))?;
+    api::result_text(context, format!("v{}", env!("CARGO_PKG_VERSION")))?;
     Ok(())
 }
 
@@ -12,7 +12,7 @@ pub fn py_debug(context: *mut sqlite3_context, _values: &[*mut sqlite3_value]) -
 
     api::result_text(
         context,
-        &format!(
+        format!(
             "Version: v{}
 Source: {}
 Python version: {}",

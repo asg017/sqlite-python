@@ -2,13 +2,13 @@
 //! sqlite3 :memory: '.read examples/test.sql'
 
 use pyo3::prelude::*;
-use pyo3::types::{PyIterator, PyTuple};
+use pyo3::types::PyTuple;
 use pyo3::PyObject;
 use sqlite_loadable::scalar::delete_scalar_function;
-use sqlite_loadable::table::{VTabWriteable, VTabWriteableWithTransactions};
+use sqlite_loadable::table::VTabWriteable;
 use sqlite_loadable::{
     api,
-    table::{BestIndexError, ConstraintOperator, IndexInfo, VTab, VTabArguments, VTabCursor},
+    table::{BestIndexError, IndexInfo, VTab, VTabArguments, VTabCursor},
     Result,
 };
 use sqlite_loadable::{define_scalar_function_with_aux, prelude::*};
@@ -16,7 +16,6 @@ use sqlite_loadable::{define_scalar_function_with_aux, prelude::*};
 use crate::utils::*;
 
 use std::collections::HashMap;
-use std::ops::Index;
 use std::{mem, os::raw::c_int};
 
 use crate::utils::value_pyobject_cloned;
@@ -80,7 +79,7 @@ impl<'vtab> VTab<'vtab> for PyFunctionsTable {
 }
 
 impl<'vtab> VTabWriteable<'vtab> for PyFunctionsTable {
-    fn update(&'vtab mut self, operation: UpdateOperation, p_rowid: *mut i64) -> Result<()> {
+    fn update(&'vtab mut self, operation: UpdateOperation, _p_rowid: *mut i64) -> Result<()> {
         match operation {
             UpdateOperation::Insert { values, rowid } => {
                 println!("rowid={:?}, len={}", rowid, values.len());
@@ -146,7 +145,7 @@ impl<'vtab> VTabWriteable<'vtab> for PyFunctionsTable {
             UpdateOperation::Delete(value) => {
                 let rowid = api::value_int64(value);
                 println!("deleting {rowid}");
-                let (name, function) = self.defined.get(&rowid).unwrap();
+                let (name, _function) = self.defined.get(&rowid).unwrap();
                 delete_scalar_function(self.db, name, 1, FunctionFlags::UTF8)?;
                 self.defined.remove(&rowid);
             }
@@ -180,7 +179,7 @@ impl VTabCursor for PyFunctionsCursor<'_> {
         &mut self,
         _idx_num: c_int,
         _idx_str: Option<&str>,
-        values: &[*mut sqlite3_value],
+        _values: &[*mut sqlite3_value],
     ) -> Result<()> {
         //let pattern = values.get(0).unwrap().text()?;
         //let contents = values.get(1).unwrap().text()?;
@@ -201,12 +200,12 @@ impl VTabCursor for PyFunctionsCursor<'_> {
         let (name, function) = self.defined.get(&self.rowid).unwrap();
         match column(i) {
             Some(Columns::Name) => {
-                api::result_text(context, name);
+                api::result_text(context, name)?;
             }
             Some(Columns::Function) => {
                 //api::result_null(context);
                 Python::with_gil(|py| {
-                    result_py(context, function.as_ref(py));
+                    result_py(context, function.as_ref(py)).unwrap();
                 });
             }
             _ => (),

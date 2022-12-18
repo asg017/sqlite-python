@@ -9,8 +9,7 @@ mod utils;
 
 use pyo3::prelude::*;
 use sqlite_loadable::{
-    api, define_scalar_function, define_scalar_function_with_aux, define_virtual_table_writeablex,
-    Error, FunctionFlags, Result,
+    api, define_scalar_function, define_virtual_table_writeablex, Error, FunctionFlags, Result,
 };
 use sqlite_loadable::{define_table_function, prelude::*};
 
@@ -146,12 +145,24 @@ pub fn py_function_from_module(
     let module = api::value_text(values.get(0).unwrap())?;
     let func_name = api::value_text(values.get(1).unwrap())?;
     Python::with_gil(|py| -> Result<()> {
-        let module =
-            PyModule::from_code(py, module, "", "").map_err(|_| Error::new_message("asdf"))?;
+        let module = PyModule::from_code(py, module, "", "").map_err(|err| {
+            Error::new_message(format!("Error loading Python module: {}", err).as_str())
+        })?;
         let func = module.getattr(func_name).unwrap();
         result_py(context, func)
     })?;
 
+    Ok(())
+}
+
+#[sqlite_entrypoint]
+pub fn sqlite3_py_define(db: *mut sqlite3) -> Result<()> {
+    let flags = FunctionFlags::UTF8 | FunctionFlags::DETERMINISTIC;
+    define_scalar_function(db, "py_version", 0, py_version, flags)?;
+    define_scalar_function(db, "py_debug", 0, py_debug, flags)?;
+
+    define_virtual_table_writeablex::<PyDefineTable>(db, "py_define", None)?;
+    define_scalar_function(db, "py_value", 1, py_value, FunctionFlags::UTF8)?;
     Ok(())
 }
 

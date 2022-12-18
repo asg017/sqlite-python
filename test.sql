@@ -1,56 +1,26 @@
 .load target/debug/libpy0
 
 insert into py_define(code)
-  values ('
-from sqlite_python_extensions import scalar_function, table_function, row, column
-
-import pdfplumber
-from io import BytesIO
-
-@row
-class PdfPlumberPagesRow():
-  def __init__(self, pdf):
-    self._page = pdf
-
-  @column
-  def number(self):
-    return self._page.page_number
-  
-  @column
-  def page(self):
-    return self._page
-  
-  @column
-  def width(self):
-    return self._page.width
-
-  @column
-  def height(self):
-    return self._page.height
-  
-  @column
-  def num_images(self):
-    return len(self._page.images)
-  
-  
-
-
-@table_function(PdfPlumberPagesRow)
-def pdfplumber_pages(pdf_data):
-  with pdfplumber.open(BytesIO(pdf_data)) as pdf:
-    for page in pdf.pages:
-      yield PdfPlumberPagesRow(page)
-
-@scalar_function
-def pdfplumber_extract_text(page):
-  return page.extract_text()
-');
+  values (readfile('test.py'));
 
 .mode box
 .header on
-select * from pdfplumber_pages(readfile('research/test.pdf'));
-select py_call_method(page, 'extract_text') from pdfplumber_pages(readfile('research/test.pdf'));
-select pdfplumber_extract_text(page) from pdfplumber_pages(readfile('research/test.pdf'));
+.timer on
+
+select pdfplumber_extract_text(5);
+select pdfplumber_extract_text(page) 
+from pdfplumber_pages(readfile('research/test.pdf'))
+limit 4;
+.exit
+
+select pages.page_number, images.*
+from pdfplumber_pages(readfile('research/test.pdf')) as pages
+join pdfplumber_images(pages.page) as images
+limit 10;
+
+select * from pdfplumber_images((select page from pdfplumber_pages(readfile('research/test.pdf')) limit 1));
+--select py_call_method(page, 'extract_text') from pdfplumber_pages(readfile('research/test.pdf'));
+--select pdfplumber_extract_text(page) from pdfplumber_pages(readfile('research/test.pdf'));
 
 .exit
 

@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyFloat, PyInt, PyString};
+use pyo3::types::{PyBytes, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 use sqlite_loadable::{api, api::ValueType, prelude::*, Result};
 
 const PYOBJECT_POINTER_NAME: &[u8] = b"pyobject0\0";
@@ -42,17 +42,17 @@ pub fn value_to_pyobject(py: Python, v: &*mut sqlite3_value) -> Option<PyObject>
 
 pub fn result_py(context: *mut sqlite3_context, result: &PyAny) -> Result<()> {
     if let Ok(value) = result.downcast::<pyo3::types::PyString>() {
-        api::result_text(context, &value.to_string_lossy())?;
+        api::result_text(context, value.to_string_lossy())?;
     } else if let Ok(value) = result.downcast::<PyFloat>() {
-      api::result_double(context, value.extract().unwrap());
-  } else if let Ok(value) = result.downcast::<PyInt>() {
+        api::result_double(context, value.extract().unwrap());
+    } else if let Ok(value) = result.downcast::<PyInt>() {
         api::result_int(context, value.extract().unwrap());
     } else if let Ok(value) = result.downcast::<PyBytes>() {
         api::result_blob(context, value.extract().unwrap());
     } else if result.is_none() {
         api::result_null(context);
     } else {
-      result_pyobject_pointer(context, result.into())
+        result_pyobject_pointer(context, result.into())
     }
     /*else if let Ok(value) = result.downcast::<PyDict>() {
         let json = PyModule::import(py, "json").unwrap();
@@ -80,5 +80,56 @@ pub fn result_py(context: *mut sqlite3_context, result: &PyAny) -> Result<()> {
         //api::result_null(context);
     }*/
 
+    Ok(())
+}
+
+pub fn result_pyobject_as_value(
+    py: Python,
+    context: *mut sqlite3_context,
+    result: &PyAny,
+) -> Result<()> {
+    if let Ok(value) = result.downcast::<pyo3::types::PyString>() {
+        api::result_text(context, value.to_string_lossy())?;
+    } else if let Ok(value) = result.downcast::<PyFloat>() {
+        api::result_double(context, value.extract().unwrap());
+    } else if let Ok(value) = result.downcast::<PyInt>() {
+        api::result_int(context, value.extract().unwrap());
+    } else if let Ok(value) = result.downcast::<PyBytes>() {
+        api::result_blob(context, value.extract().unwrap());
+    } else if result.is_none() {
+        api::result_null(context);
+    } else if let Ok(value) = result.downcast::<PyDict>() {
+        let json = PyModule::import(py, "json").unwrap();
+        let s: String = json
+            .getattr("dumps")
+            .unwrap()
+            .call1((value,))
+            .unwrap()
+            .extract()
+            .unwrap();
+        api::result_text(context, s.as_str())?;
+    } else if let Ok(value) = result.downcast::<PyList>() {
+        let json = PyModule::import(py, "json").unwrap();
+        let s: String = json
+            .getattr("dumps")
+            .unwrap()
+            .call1((value,))
+            .unwrap()
+            .extract()
+            .unwrap();
+        api::result_text(context, s.as_str())?;
+    } else if let Ok(value) = result.downcast::<PyTuple>() {
+        let json = PyModule::import(py, "json").unwrap();
+        let s: String = json
+            .getattr("dumps")
+            .unwrap()
+            .call1((value,))
+            .unwrap()
+            .extract()
+            .unwrap();
+        api::result_text(context, s.as_str())?;
+    } else {
+        result_pyobject_pointer(context, result.into())
+    }
     Ok(())
 }

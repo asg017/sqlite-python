@@ -2,3 +2,5 @@
 *.db
 *.json
 *.webm
+
+*.dylib

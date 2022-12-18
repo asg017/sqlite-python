@@ -2,14 +2,12 @@ use pyo3::exceptions::PyStopIteration;
 use pyo3::prelude::*;
 use pyo3::types::{PyIterator, PyTuple};
 use pyo3::PyObject;
+use sqlite_loadable::prelude::*;
 use sqlite_loadable::{
-    api,
     table::{BestIndexError, IndexInfo, VTab, VTabArguments, VTabCursor},
     Result,
 };
-use sqlite_loadable::{prelude::*, Error};
 
-use std::collections::HashMap;
 use std::{mem, os::raw::c_int};
 
 #[derive(Clone)]
@@ -65,7 +63,7 @@ impl<'vtab> VTab<'vtab> for PyApiTableBuilder {
             let column_idx = constraint.column_idx() as usize;
             match self.columns.get(column_idx) {
                 Some(column) => {
-                    if column.required {
+                    if constraint.usable() && column.required {
                         required_column_constraints.insert(column_idx);
                         constraint.set_omit(true);
                         constraint.set_argv_index(argv);
@@ -92,7 +90,7 @@ impl<'vtab> VTab<'vtab> for PyApiTableBuilder {
 }
 use std::collections::HashSet;
 
-use crate::utils::{result_py, value_to_pyobject};
+use crate::utils::{result_pyobject_as_value, value_to_pyobject};
 
 #[repr(C)]
 pub struct PyApiTableCursor<'a> {
@@ -177,9 +175,11 @@ impl<'a> VTabCursor for PyApiTableCursor<'a> {
                 .value
                 .as_ref()
                 .unwrap()
-                .call_method0(py, column.name.as_str())
+                .getattr(py, column.name.as_str())
                 .unwrap();
-            result_py(context, v.as_ref(py)).unwrap();
+            //.call_method0(py, column.name.as_str())
+            //.unwrap();
+            result_pyobject_as_value(py, context, v.as_ref(py)).unwrap();
         });
         Ok(())
     }
